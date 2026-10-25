@@ -1,0 +1,109 @@
+[PROJECT]
+Target=colores.hex
+Processor_Text=PIC16F877A
+CCSVersion=5.112
+Compiler=PCM
+[Target Data]
+FileList=colores.c
+[colores.c]
+Type=4
+[mru-list]
+1=colores.c
+
+[defines]
+buildcount=24
+
+[ProjectLog]
+Days=3
+D1=21-05-2025
+D1_L=13
+D1_L1=[59800]Stopped Editing.
+TotalEdit=331
+TotalDebug=0
+D1_E=1
+D1_D=0
+D1_L2=[59807]Project Closed.
+D1_L3=[59891]Project Opened.
+D1_L4=[59897]Started Editing.
+D1_L5=[60198]Stopped Editing.
+D1_L6=[60623]Started Editing.
+D1_L7=[60923]Stopped Editing.
+D1_L8=[63105]Started Editing.
+D1_L9=[80236]Stopped Editing.
+D1_L10=[81173]Started Editing.
+D1_L11=[82869]Stopped Editing.
+D1_L12=[83221]Started Editing.
+D1_L13=[83818]Stopped Editing.
+D2=22-05-2025
+D2_L=33
+D2_L1=[105]Started Editing.
+D2_L2=[530]Stopped Editing.
+D2_E=320
+D2_D=0
+D2_L3=[530]Project Closed.
+D2_L4=[774]Project Opened.
+D2_L5=[813]Started Editing.
+D2_L6=[1208]Stopped Editing.
+D2_L7=[2274]Started Editing.
+D2_L8=[2577]Stopped Editing.
+D2_L9=[3125]Started Editing.
+D2_L10=[3468]Stopped Editing.
+D2_L11=[3747]Started Editing.
+D2_L12=[4049]Stopped Editing.
+D2_L13=[5498]Started Editing.
+D2_L14=[5800]Stopped Editing.
+D2_L15=[32386]Started Editing.
+D2_L16=[32745]Stopped Editing.
+D2_L17=[33032]Started Editing.
+D2_L18=[33333]Stopped Editing.
+D2_L19=[33367]Started Editing.
+D2_L20=[33673]Stopped Editing.
+D2_L21=[33760]Started Editing.
+D2_L22=[34062]Stopped Editing.
+D2_L23=[34273]Project Closed.
+D2_L24=[34735]Project Opened.
+D2_L25=[34762]Started Editing.
+D2_L26=[35063]Stopped Editing.
+D2_L27=[42136]Started Editing.
+D2_L28=[42707]Stopped Editing.
+D2_L29=[49892]Started Editing.
+D2_L30=[50192]Stopped Editing.
+D2_L31=[55480]Project Opened.
+D2_L32=[55994]Started Editing.
+D2_L33=[56486]Stopped Editing.
+D3=25-05-2025
+D3_L=19
+D3_L1=[50621]Project Opened.
+D3_L2=[57671]Started Editing.
+D3_L3=[57971]Stopped Editing.
+D3_L4=[60741]Started Editing.
+D3_L5=[61079]Stopped Editing.
+D3_L6=[61732]Started Editing.
+D3_L7=[62033]Stopped Editing.
+D3_L8=[62619]Started Editing.
+D3_L9=[62935]Stopped Editing.
+D3_E=10
+D3_D=0
+D3_L10=[63139]Project Closed.
+D3_L11=[63336]Project Opened.
+D3_L12=[63541]Started Editing.
+D3_L13=[63844]Stopped Editing.
+D3_L14=[63947]Started Editing.
+D3_L15=[64440]Stopped Editing.
+D3_L16=[64440]Project Closed.
+D3_L17=[66439]Project Opened.
+D3_L18=[66454]Project Closed.
+D3_L19=[66464]Project Opened.
+
+[fileformats]
+forcecoff=0
+
+[Opened Files]
+1=colores.c
+t1=1
+Count=1
+2=..\..\proyecto caja fuerte\cajafuerte.c
+t2=1
+[Units]
+Count=1
+1=colores (main)

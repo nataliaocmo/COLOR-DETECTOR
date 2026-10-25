@@ -1,0 +1,213 @@
+#include <16F877A.h>
+#use delay(crystal=4MHz)
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+#use I2C(SLAVE, SDA=PIN_C4, SCL=PIN_C3, address=0x11, FORCE_HW)
+
+/* Pines para LCD */
+#define LCD_RS PIN_D0
+#define LCD_RW PIN_D1
+#define LCD_EN PIN_D2
+#define LCD_D4 PIN_D4
+#define LCD_D5 PIN_D5
+#define LCD_D6 PIN_D6
+#define LCD_D7 PIN_D7
+
+/* Pines LEDs RGB */
+#define LED_RED   PIN_C0
+#define LED_GREEN PIN_C1
+#define LED_BLUE  PIN_C2
+
+/* Variables globales */
+char i2c_buffer[32];
+int8 buffer_index = 0;
+char color_name[16];
+int red, green, blue;
+
+/* Prototipos */
+void lcd_init();
+void lcd_command(unsigned char cmd);
+void lcd_write_char(char c);
+void lcd_write_str(const char *str);
+void lcd_clear();
+void parse_color_data();
+void update_leds();
+int string_to_int(const char *str);
+
+#INT_SSP
+void i2c_interrupt() {
+   int8 incoming, state;
+   state = i2c_isr_state();
+
+   if(state < 0x80) { // Escribiendo desde el master
+      incoming = i2c_read();
+      if(incoming == '\n' || buffer_index >= sizeof(i2c_buffer)-1) {
+         i2c_buffer[buffer_index] = '\0';
+         parse_color_data();
+         buffer_index = 0;
+      } else {
+         i2c_buffer[buffer_index++] = incoming;
+      }
+   }
+
+   if(state == 0x80) { // Master solicita datos
+      i2c_write(0); // Dummy
+   }
+}
+
+void main() {
+   set_tris_d(0x00); // LCD salida
+   set_tris_c(0x18); // C3, C4 como entradas para I2C
+
+   lcd_init();
+   output_low(LED_RED);
+   output_low(LED_GREEN);
+   output_low(LED_BLUE);
+
+   enable_interrupts(INT_SSP);
+   enable_interrupts(GLOBAL);
+
+   lcd_clear();
+   lcd_write_str("Sistema Listo");
+   delay_ms(1000);
+   lcd_clear();
+   lcd_write_str("Esperando...");
+
+   while(TRUE) {
+      delay_ms(100); // Espera pasiva
+   }
+}
+
+int string_to_int(const char *str) {
+   int result = 0;
+   while(*str) {
+      if(*str >= '0' && *str <= '9') {
+         result = result * 10 + (*str - '0');
+      }
+      str++;
+   }
+   return result;
+}
+
+void parse_color_data() {
+   int i = 0, j = 0;
+   char temp[10];
+
+   // Color
+   while(i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(color_name)-1) {
+      color_name[j++] = i2c_buffer[i++];
+   }
+   color_name[j] = '\0';
+   i++;
+
+   // Red
+   j = 0;
+   while(i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(temp)-1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   red = string_to_int(temp);
+   i++;
+
+   // Green
+   j = 0;
+   while(i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(temp)-1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   green = string_to_int(temp);
+   i++;
+
+   // Blue
+   j = 0;
+   while(i2c_buffer[i] != '\0' && j < sizeof(temp)-1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   blue = string_to_int(temp);
+
+   lcd_clear();
+   lcd_write_str("Color:");
+   lcd_command(0xC0);
+   lcd_write_str(color_name);
+   update_leds();
+}
+
+void update_leds() {
+   if(red > 0) {
+      output_high(LED_RED);
+      delay_ms(red);
+      output_low(LED_RED);
+   }
+   if(green > 0) {
+      output_high(LED_GREEN);
+      delay_ms(green);
+      output_low(LED_GREEN);
+   }
+   if(blue > 0) {
+      output_high(LED_BLUE);
+      delay_ms(blue);
+      output_low(LED_BLUE);
+   }
+}
+
+/* LCD funciones */
+void lcd_init() {
+   delay_ms(15);
+   lcd_command(0x03);
+   delay_ms(5);
+   lcd_command(0x03);
+   delay_us(100);
+   lcd_command(0x03);
+   lcd_command(0x02);
+   lcd_command(0x28);
+   lcd_command(0x0C);
+   lcd_command(0x06);
+   lcd_command(0x01);
+   delay_ms(2);
+}
+
+void lcd_command(unsigned char cmd) {
+   output_low(LCD_RS);
+   output_low(LCD_RW);
+   // Parte alta
+   output_bit(LCD_D4, (cmd >> 4) & 1);
+   output_bit(LCD_D5, (cmd >> 5) & 1);
+   output_bit(LCD_D6, (cmd >> 6) & 1);
+   output_bit(LCD_D7, (cmd >> 7) & 1);
+   output_high(LCD_EN); delay_us(1); output_low(LCD_EN); delay_us(100);
+   // Parte baja
+   output_bit(LCD_D4, (cmd >> 0) & 1);
+   output_bit(LCD_D5, (cmd >> 1) & 1);
+   output_bit(LCD_D6, (cmd >> 2) & 1);
+   output_bit(LCD_D7, (cmd >> 3) & 1);
+   output_high(LCD_EN); delay_us(1); output_low(LCD_EN); delay_ms(2);
+}
+
+void lcd_write_char(char c) {
+   output_high(LCD_RS);
+   output_low(LCD_RW);
+   // Parte alta
+   output_bit(LCD_D4, (c >> 4) & 1);
+   output_bit(LCD_D5, (c >> 5) & 1);
+   output_bit(LCD_D6, (c >> 6) & 1);
+   output_bit(LCD_D7, (c >> 7) & 1);
+   output_high(LCD_EN); delay_us(1); output_low(LCD_EN); delay_us(100);
+   // Parte baja
+   output_bit(LCD_D4, (c >> 0) & 1);
+   output_bit(LCD_D5, (c >> 1) & 1);
+   output_bit(LCD_D6, (c >> 2) & 1);
+   output_bit(LCD_D7, (c >> 3) & 1);
+   output_high(LCD_EN); delay_us(1); output_low(LCD_EN); delay_us(100);
+}
+
+void lcd_write_str(const char *str) {
+   while(*str) {
+      lcd_write_char(*str++);
+   }
+}
+
+void lcd_clear() {
+   lcd_command(0x01);
+   delay_ms(2);
+}
+

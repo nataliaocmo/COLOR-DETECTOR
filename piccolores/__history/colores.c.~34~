@@ -1,0 +1,97 @@
+#include <16F877A.h>
+#device ADC=10
+#use delay(clock=20000000)
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+
+// Configuración I2C - PIC como esclavo
+#use I2C(SLAVE, SDA=PIN_C4, SCL=PIN_C3, address=0x11)
+
+// Definir pines para LCD
+#define LCD_RS  PIN_D0
+#define LCD_RW  PIN_D1
+#define LCD_E   PIN_D2
+#define LCD_D4  PIN_D4
+#define LCD_D5  PIN_D5
+#define LCD_D6  PIN_D6
+#define LCD_D7  PIN_D7
+
+// Definir pines para LEDs
+#define LED_ROJO   PIN_B0
+#define LED_VERDE  PIN_B1
+#define LED_AZUL   PIN_B2
+
+// Incluir biblioteca LCD
+#include <lcd.c>
+
+char mensaje_recibido[33];  // Buffer para el mensaje (32 chars + null)
+int8 indice = 0;
+// Definir constantes para estados I2C (específicas para CCS)
+#define I2C_SLAVE_WRITE_DATA 0x80
+#define I2C_SLAVE_READ_DATA  0x40
+// Función de manejo de interrupciones I2C
+#INT_SSP
+void ssp_interrupt() {
+    char state = i2c_isr_state();
+    
+    if(state == I2C_SLAVE_DATA) {
+        char dato = i2c_read();
+        
+        if(dato == '\n' || indice >= sizeof(mensaje_recibido)-1) {
+            mensaje_recibido[indice] = '\0';  // Terminar string
+            indice = 0;
+            
+            // Actualizar LCD
+            lcd_gotoxy(1, 1);
+            lcd_putc("Recibido:      ");
+            lcd_gotoxy(1, 2);
+            lcd_putc(mensaje_recibido);
+            
+            // Controlar LEDs basado en el mensaje
+            if(strstr(mensaje_recibido, "Rojo")) {
+                output_high(LED_ROJO);
+                output_low(LED_VERDE);
+                output_low(LED_AZUL);
+            }
+            else if(strstr(mensaje_recibido, "Verde")) {
+                output_low(LED_ROJO);
+                output_high(LED_VERDE);
+                output_low(LED_AZUL);
+            }
+            else if(strstr(mensaje_recibido, "Azul")) {
+                output_low(LED_ROJO);
+                output_low(LED_VERDE);
+                output_high(LED_AZUL);
+            }
+            else {
+                output_low(LED_ROJO);
+                output_low(LED_VERDE);
+                output_low(LED_AZUL);
+            }
+        } else {
+            mensaje_recibido[indice++] = dato;
+        }
+    }
+}
+
+void main() {
+    // Configurar pines
+    set_tris_b(0x00);  // Puerto B como salida para LEDs
+    output_b(0x00);    // Inicialmente todos los LEDs apagados
+    
+    // Inicializar LCD
+    lcd_init();
+    lcd_putc('\f');  // Limpiar LCD
+    lcd_gotoxy(1, 1);
+    lcd_putc("Esperando datos");
+    lcd_gotoxy(1, 2);
+    lcd_putc("...            ");
+    
+    // Habilitar interrupciones
+    enable_interrupts(INT_SSP);
+    enable_interrupts(GLOBAL);
+    
+    while(TRUE) {
+        // El trabajo principal se hace en las interrupciones
+        delay_ms(100);
+    }
+}

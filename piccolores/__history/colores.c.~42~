@@ -1,0 +1,57 @@
+#include <16F877A.h>
+#device ADC=10
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+#use delay(clock=20000000)
+
+// I2C esclavo en C3 (SCL), C4 (SDA)
+#use i2c(SLAVE, SDA=PIN_C4, SCL=PIN_C3, address=0x08, FORCE_HW)
+
+#define LED_RED    PIN_B0
+#define LED_GREEN  PIN_B1
+#define LED_BLUE   PIN_B2
+
+int8 buffer[15];
+int8 index = 0;
+int1 datos_listos = FALSE;
+
+#int_ssp
+void i2c_isr() {
+  int8 estado = i2c_isr_state();
+
+  if (estado < 0x80) {
+    int8 valor = i2c_read();
+    if (estado == 1) index = 0;
+    if (index < 15) {
+      buffer[index++] = valor;
+    }
+    if (index == 15) {
+      datos_listos = TRUE;
+    }
+  }
+}
+
+void setup() {
+  set_tris_b(0x00);
+  output_b(0x00);
+  enable_interrupts(INT_SSP);
+  enable_interrupts(GLOBAL);
+}
+
+void encender_leds(int8 r, int8 g, int8 b) {
+  output_bit(LED_RED,   r > 127);
+  output_bit(LED_GREEN, g > 127);
+  output_bit(LED_BLUE,  b > 127);
+}
+
+void loop() {
+  while (TRUE) {
+    if (datos_listos) {
+      int8 r = buffer[12];
+      int8 g = buffer[13];
+      int8 b = buffer[14];
+      encender_leds(r, g, b);
+      datos_listos = FALSE;
+    }
+  }
+}
+

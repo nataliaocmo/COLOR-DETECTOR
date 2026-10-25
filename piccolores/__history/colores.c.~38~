@@ -1,0 +1,46 @@
+#include <16F877A.h>
+#use delay(crystal=4MHz)
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+#use I2C(SLAVE, SDA=PIN_C4, SCL=PIN_C3, address=0x11, FORCE_HW)
+
+// Configuración LCD (igual a tu versión anterior)
+#define LCD_RS  PIN_D0
+#define LCD_RW  PIN_D1
+#define LCD_E   PIN_D2
+#define LCD_D4  PIN_D4
+// ... (resto de pines LCD)
+#include <lcd.c>
+
+char buffer[32];
+int8 index = 0;
+
+#INT_SSP
+void interrupcion_i2c() {
+  if(i2c_isr_state() == 0x80) { // Datos recibidos
+    char dato = i2c_read();
+    
+    if(dato == '\n' || index >= sizeof(buffer)-1) {
+      buffer[index] = '\0';
+      index = 0;
+      
+      // Mostrar en LCD
+      lcd_gotoxy(1,1);
+      lcd_putc("Recibido:");
+      lcd_gotoxy(1,2);
+      lcd_putc(buffer);
+    } else {
+      buffer[index++] = dato;
+    }
+  }
+}
+
+void main() {
+  lcd_init();
+  lcd_putc('\f');
+  lcd_putc("Esperando I2C...");
+  
+  enable_interrupts(INT_SSP);
+  enable_interrupts(GLOBAL);
+  
+  while(TRUE);
+}

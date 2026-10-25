@@ -1,0 +1,232 @@
+prueba este:
+#include <16F877A.h>
+#use delay(crystal=4MHz)
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+#device ADC=10
+#use I2C(SLAVE, SDA=PIN_C4, SCL=PIN_C3, address=0x11, FORCE_HW)
+
+/* Definición de pines para el LCD */
+#define LCD_RS PIN_D0
+#define LCD_RW PIN_D1
+#define LCD_EN PIN_D2
+#define LCD_D4 PIN_D4
+#define LCD_D5 PIN_D5
+#define LCD_D6 PIN_D6
+#define LCD_D7 PIN_D7
+
+/* Definición de pines para LEDs RGB */
+#define LED_RED   PIN_C0
+#define LED_GREEN PIN_C1
+#define LED_BLUE  PIN_C2
+
+/* Buffer para datos recibidos */
+char i2c_buffer[32];
+int8 buffer_index = 0;
+char color_name[16];
+int red, green, blue;
+
+/* Prototipos de funciones */
+void lcd_init();
+void lcd_command(unsigned char cmd);
+void lcd_write_char(char c);
+void lcd_write_str(const char str);  // Cambiado a const char
+void lcd_clear();
+void parse_color_data();
+void update_leds();
+int string_to_int(const char *str);   // Nuestra implementación de atoi
+
+#INT_SSP
+void i2c_interrupt() {
+   char status = i2c_slave_data();  // Cambiado a la función correcta
+   
+   if(status) {
+      char received = i2c_read();
+      
+      if(received == '\n' || buffer_index >= sizeof(i2c_buffer)-1) {
+         i2c_buffer[buffer_index] = '\0';
+         parse_color_data();
+         buffer_index = 0;
+      } else {
+         i2c_buffer[buffer_index++] = received;
+      }
+   }
+}
+
+void main() {
+   /* Configuración de puertos */
+   set_tris_d(0x00);  // Puerto D como salida (LCD)
+   set_tris_c(0x18);  // C4 (SDA) y C3 (SCL) como entradas, otros como salidas
+   
+   /* Inicializar periféricos */
+   lcd_init();
+   output_low(LED_RED);
+   output_low(LED_GREEN);
+   output_low(LED_BLUE);
+   
+   /* Habilitar interrupciones */
+   enable_interrupts(INT_SSP);
+   enable_interrupts(GLOBAL);
+   
+   /* Mensaje inicial */
+   lcd_clear();
+   lcd_write_str("Sistema Listo");
+   delay_ms(1000);
+   lcd_clear();
+   lcd_write_str("Esperando...");
+   
+   while(TRUE) {
+      /* El trabajo principal se hace en las interrupciones */
+      delay_ms(100);
+   }
+}
+
+/* Implementación propia de atoi */
+int string_to_int(const char *str) {
+   int result = 0;
+   while(*str) {
+      if(*str >= '0' && *str <= '9') {
+         result = result * 10 + (*str - '0');
+      }
+      str++;
+   }
+   return result;
+}
+
+void parse_color_data() {
+   int i = 0, j = 0;
+   char temp[10];
+   
+   /* Extraer nombre del color */
+   while(i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(color_name)-1) {
+      color_name[j++] = i2c_buffer[i++];
+   }
+   color_name[j] = '\0';
+   i++; // Saltar la coma
+   
+   /* Extraer valor Red */
+   j = 0;
+   while(i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(temp)-1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   red = string_to_int(temp);
+   i++; // Saltar la coma
+   
+   /* Extraer valor Green */
+   j = 0;
+   while(i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(temp)-1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   green = string_to_int(temp);
+   i++; // Saltar la coma
+   
+   /* Extraer valor Blue */
+   j = 0;
+   while(i2c_buffer[i] != '\0' && j < sizeof(temp)-1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   blue = string_to_int(temp);
+   
+   /* Actualizar displays */
+   lcd_clear();
+   lcd_write_str("Color:");
+   lcd_command(0xC0); // Segunda línea
+   lcd_write_str(color_name);
+   
+   update_leds();
+}
+
+void update_leds() {
+   /* Controlar LEDs con PWM básico */
+   output_high(LED_RED);
+   output_high(LED_GREEN);
+   output_high(LED_BLUE);
+   
+   delay_ms(red);
+   output_low(LED_RED);
+   
+   delay_ms(green);
+   output_low(LED_GREEN);
+   
+   delay_ms(blue);
+   output_low(LED_BLUE);
+}
+
+/* Funciones para el LCD (modo 4 bits) */
+void lcd_init() {
+   delay_ms(15);
+   lcd_command(0x03);
+   delay_ms(5);
+   lcd_command(0x03);
+   delay_us(100);
+   lcd_command(0x03);
+   lcd_command(0x02); // Modo 4 bits
+   lcd_command(0x28); // 2 líneas, 5x8 puntos
+   lcd_command(0x0C); // Display on, cursor off
+   lcd_command(0x06); // Incremento cursor
+   lcd_command(0x01); // Clear display
+   delay_ms(2);
+}
+
+void lcd_command(unsigned char cmd) {
+   output_low(LCD_RS);
+   output_low(LCD_RW);
+   
+   output_bit(LCD_D4, cmd & 0x10);
+   output_bit(LCD_D5, cmd & 0x20);
+   output_bit(LCD_D6, cmd & 0x40);
+   output_bit(LCD_D7, cmd & 0x80);
+   
+   output_high(LCD_EN);
+   delay_us(1);
+   output_low(LCD_EN);
+   delay_us(100);
+   
+   output_bit(LCD_D4, cmd & 0x01);
+   output_bit(LCD_D5, cmd & 0x02);
+   output_bit(LCD_D6, cmd & 0x04);
+   output_bit(LCD_D7, cmd & 0x08);
+   
+   output_high(LCD_EN);
+   delay_us(1);
+   output_low(LCD_EN);
+   delay_ms(2);
+}
+
+void lcd_write_char(char c) {
+   output_high(LCD_RS);
+   output_low(LCD_RW);
+   
+   output_bit(LCD_D4, c & 0x10);
+   output_bit(LCD_D5, c & 0x20);
+   output_bit(LCD_D6, c & 0x40);
+   output_bit(LCD_D7, c & 0x80);
+   
+   output_high(LCD_EN);
+   delay_us(1);
+   output_low(LCD_EN);
+   delay_us(100);
+   
+   output_bit(LCD_D4, c & 0x01);
+   output_bit(LCD_D5, c & 0x02);
+   output_bit(LCD_D6, c & 0x04);
+   output_bit(LCD_D7, c & 0x08);
+   
+   output_high(LCD_EN);
+   delay_us(1);
+   output_low(LCD_EN);
+   delay_us(100);
+}
+
+void lcd_write_str(const char *str) {
+   while(*str) {
+      lcd_write_char(*str++);
+   }
+}
+
+void lcd_clear() {
+   lcd_command(0x01);
+   delay_ms(2);
+}

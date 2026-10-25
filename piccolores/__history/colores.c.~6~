@@ -1,0 +1,104 @@
+#include <16F877A.h>
+#device ADC=10
+#use delay(crystal=20000000)
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+
+// Configuración I2C - PIC como esclavo
+#use I2C(SLAVE, SDA=PIN_C4, SCL=PIN_C3, address=0x11)
+
+// Definir pines para LCD
+#define LCD_RS  PIN_D0
+#define LCD_RW  PIN_D1
+#define LCD_E   PIN_D2
+#define LCD_D4  PIN_D4
+#define LCD_D5  PIN_D5
+#define LCD_D6  PIN_D6
+#define LCD_D7  PIN_D7
+
+// Definir pines para LEDs
+#define LED_ROJO     PIN_B0
+#define LED_AZUL     PIN_B1  // Cambiado de VERDE a AZUL
+#define LED_AMARILLO PIN_B2  // Cambiado de EXTRA a AMARILLO
+
+// Incluir biblioteca LCD
+#include <lcd.c>
+
+char color_actual = 'O';  // Inicialmente apagado (O)
+
+// Función de manejo de interrupciones I2C
+#INT_SSP
+void ssp_interrupt() {
+  char incoming;
+  
+  // Leer el estado del SSP
+  int state = i2c_isr_state();
+  
+  // Si es una operación de escritura
+  if(state == 0) {
+    // Leer el byte recibido
+    incoming = i2c_read();
+    
+    // Guardar el comando recibido
+    if(incoming == 'R' || incoming == 'B' || incoming == 'Y' || incoming == 'O') {
+      color_actual = incoming;
+    }
+  }
+}
+
+void main() {
+  // Configurar pines
+  set_tris_b(0x00);  // Puerto B como salida para LEDs
+  output_b(0x00);    // Inicialmente todos los LEDs apagados
+  
+  // Inicializar LCD
+  lcd_init();
+  lcd_putc('\f');
+  lcd_gotoxy(1, 1);
+  lcd_putc("PIC16F877A");
+  lcd_gotoxy(1, 2);
+  lcd_putc("Color: Ninguno");
+  
+  // Habilitar interrupciones
+  enable_interrupts(INT_SSP);
+  enable_interrupts(GLOBAL);
+  
+  while(TRUE) {
+    // Procesar el comando actual
+    switch(color_actual) {
+      case 'R':  // Rojo
+        output_high(LED_ROJO);
+        output_low(LED_AZUL);
+        output_low(LED_AMARILLO);
+        lcd_gotoxy(1, 2);
+        lcd_putc("Color: ROJO    ");
+        break;
+        
+      case 'B':  // Azul (antes era G para verde)
+        output_low(LED_ROJO);
+        output_high(LED_AZUL);
+        output_low(LED_AMARILLO);
+        lcd_gotoxy(1, 2);
+        lcd_putc("Color: AZUL    ");
+        break;
+        
+      case 'Y':  // Amarillo (antes era E para extra)
+        output_low(LED_ROJO);
+        output_low(LED_AZUL);
+        output_high(LED_AMARILLO);
+        lcd_gotoxy(1, 2);
+        lcd_putc("Color: AMARILLO");
+        break;
+        
+      case 'O':  // Apagado
+      default:
+        output_low(LED_ROJO);
+        output_low(LED_AZUL);
+        output_low(LED_AMARILLO);
+        lcd_gotoxy(1, 2);
+        lcd_putc("Color: Ninguno ");
+        break;
+    }
+    
+    delay_ms(100);  // Pequeña pausa
+  }
+}

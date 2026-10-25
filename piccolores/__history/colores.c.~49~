@@ -1,0 +1,128 @@
+#include <16F877A.h>
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+#use delay(clock=20000000)
+#use i2c(SLAVE, SDA=PIN_C4, SCL=PIN_C3, address=0x22, FORCE_HW)
+
+/* Pines para LEDs RGB */
+#define LED_ROJO     PIN_B0
+#define LED_AMARILLO PIN_B1
+#define LED_AZUL     PIN_B2
+
+/* Pines para LCD */
+#define LCD_RS PIN_D0
+#define LCD_RW PIN_D1
+#define LCD_EN PIN_D2
+#define LCD_D4 PIN_D4
+#define LCD_D5 PIN_D5
+#define LCD_D6 PIN_D6
+#define LCD_D7 PIN_D7
+
+#include <lcd.c>
+
+char i2c_buffer[32];
+int8 i2c_index = 0;
+int1 nuevo_dato = FALSE;
+int8 r = 0, g = 0, b = 0;
+char nombre_color[16];
+
+#int_SSP
+void i2c_isr() {
+   int8 estado = i2c_isr_state();
+
+   if (estado < 0x80) { // Escritura del maestro
+      char valor = i2c_read();
+      if (valor == '\n') {
+         i2c_buffer[i2c_index] = '\0';
+         i2c_index = 0;
+         nuevo_dato = TRUE;
+      } else {
+         if (i2c_index < sizeof(i2c_buffer) - 1) {
+            i2c_buffer[i2c_index++] = valor;
+         }
+      }
+   }
+}
+
+int string_to_int(char *str) {
+   int result = 0;
+   while (*str >= '0' && *str <= '9') {
+      result = result * 10 + (*str - '0');
+      str++;
+   }
+   return result;
+}
+
+void parsear_datos() {
+   int i = 0, j = 0;
+   char temp[10];
+
+   // Nombre
+   while (i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(nombre_color) - 1) {
+      nombre_color[j++] = i2c_buffer[i++];
+   }
+   nombre_color[j] = '\0';
+   i++;
+
+   // R
+   j = 0;
+   while (i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(temp) - 1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   r = string_to_int(temp);
+   i++;
+
+   // G
+   j = 0;
+   while (i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(temp) - 1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   g = string_to_int(temp);
+   i++;
+
+   // B
+   j = 0;
+   while (i2c_buffer[i] != '\0' && j < sizeof(temp) - 1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   b = string_to_int(temp);
+}
+
+void main() {
+   set_tris_b(0x00); // LEDs
+   set_tris_d(0x00); // LCD
+   output_b(0x00);
+   lcd_init();
+
+   enable_interrupts(GLOBAL);
+   enable_interrupts(INT_SSP);
+
+   lcd_putc("\fEsperando...\n");
+
+   while (TRUE) {
+      if (nuevo_dato) {
+         parsear_datos();
+
+         // Mostrar nombre del color en LCD
+         lcd_putc('\f');
+         lcd_gotoxy(1, 1);
+         printf(lcd_putc, "Color: %s", nombre_color);
+         lcd_gotoxy(1, 2);
+         printf(lcd_putc, "R:%3u G:%3u B:%3u", r, g, b);
+
+         // Lógica para encender LEDs
+         int1 esRojo = (r > 200 && g < 100 && b < 100);
+         int1 esAmarillo = (r > 200 && g > 200 && b < 100);
+         int1 esAzul = (b > 200 && r < 100 && g < 100);
+
+         output_bit(LED_ROJO, esRojo);
+         output_bit(LED_AMARILLO, esAmarillo);
+         output_bit(LED_AZUL, esAzul);
+
+         nuevo_dato = FALSE;
+      }
+   }
+}
+

@@ -1,0 +1,105 @@
+LIST P=16F877A
+#include <P16F877A.INC>
+
+; Variables
+CBLOCK 0x20
+    I2C_DATA
+    LCD_BUFFER:16
+    LED_RED
+    LED_GREEN
+    LED_BLUE
+ENDC
+
+; Configuración inicial
+ORG 0x00
+    GOTO INICIO
+
+ORG 0x04
+    GOTO INTERRUPCION_I2C
+
+INICIO:
+    ; Configurar puertos
+    BANKSEL TRISB
+    MOVLW b'00000110' ; SDA y SCL como entradas
+    MOVWF TRISB
+    CLRF TRISD        ; Puerto D para LCD
+    BCF TRISC, 0      ; RC0 como salida (LED Rojo)
+    BCF TRISC, 1      ; RC1 como salida (LED Verde)
+    BCF TRISC, 2      ; RC2 como salida (LED Azul)
+    
+    ; Inicializar I2C Slave
+    BANKSEL SSPCON
+    MOVLW b'00110110' ; Modo I2C Slave, 7-bit address
+    MOVWF SSPCON
+    MOVLW 0x11        ; Dirección del esclavo (0x11)
+    MOVWF SSPADD
+    
+    ; Habilitar interrupciones
+    BSF PIE1, SSPIE
+    BSF INTCON, PEIE
+    BSF INTCON, GIE
+    
+    ; Inicializar LCD
+    CALL INIT_LCD
+    GOTO MAIN
+
+MAIN:
+    ; Mostrar mensaje en LCD
+    MOVLW 'E'
+    CALL SEND_LCD_DATA
+    MOVLW 's'
+    CALL SEND_LCD_DATA
+    MOVLW 'p'
+    CALL SEND_LCD_DATA
+    MOVLW 'e'
+    CALL SEND_LCD_DATA
+    MOVLW 'r'
+    CALL SEND_LCD_DATA
+    MOVLW 'a'
+    CALL SEND_LCD_DATA
+    MOVLW 'n'
+    CALL SEND_LCD_DATA
+    MOVLW 'd'
+    CALL SEND_LCD_DATA
+    MOVLW 'o'
+    CALL SEND_LCD_DATA
+    GOTO MAIN
+
+INTERRUPCION_I2C:
+    BANKSEL PIR1
+    BTFSS PIR1, SSPIF
+    RETFIE
+    
+    ; Leer dato recibido
+    BANKSEL SSPBUF
+    MOVF SSPBUF, W
+    MOVWF I2C_DATA
+    
+    ; Procesar comando
+    CALL PROCESAR_COMANDO
+    
+    ; Limpiar flag de interrupción
+    BANKSEL PIR1
+    BCF PIR1, SSPIF
+    RETFIE
+
+PROCESAR_COMANDO:
+    ; Aquí procesarías los datos recibidos
+    ; Ejemplo: "Rojo,255,0,0"
+    ; Deberías implementar un buffer y lógica de parsing
+    RETURN
+
+; Rutinas para LCD (dependerán de tu conexión exacta)
+INIT_LCD:
+    ; Implementar inicialización LCD
+    RETURN
+
+SEND_LCD_DATA:
+    ; Implementar envío de datos al LCD
+    RETURN
+
+SEND_LCD_CMD:
+    ; Implementar envío de comandos al LCD
+    RETURN
+
+END

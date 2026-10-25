@@ -1,0 +1,14 @@
+#include <16F877A.h>
+#use delay(crystal=4MHz)
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+
+#define LED_TEST PIN_B0  // Conecta un LED + resistencia 220O a este pin
+
+void main() {
+    while(TRUE) {
+        output_high(LED_TEST);  // LED ON
+        delay_ms(500);
+        output_low(LED_TEST);   // LED OFF
+        delay_ms(500);
+    }
+}

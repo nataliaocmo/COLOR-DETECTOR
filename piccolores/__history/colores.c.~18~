@@ -1,0 +1,186 @@
+#include <16F877A.h>
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+#use delay(clock=4000000)
+#use i2c(SLAVE, SDA=PIN_C4, SCL=PIN_C3, ADDRESS=0x11)
+
+#define LCD_RS PIN_D0
+#define LCD_RW PIN_D1
+#define LCD_EN PIN_D2
+#define LCD_D4 PIN_D4
+#define LCD_D5 PIN_D5
+#define LCD_D6 PIN_D6
+#define LCD_D7 PIN_D7
+
+#define LED_RED   PIN_C0
+#define LED_GREEN PIN_C1
+#define LED_BLUE  PIN_C2
+
+char i2c_buffer[32];
+int8 buffer_index = 0;
+char color_name[16];
+int red = 0, green = 0, blue = 0;
+
+#INT_SSP
+void i2c_isr() {
+   int status = i2c_isr_state();
+
+   if (status < 0x80) {
+      i2c_read(); // Dummy read
+   } else if (status == 0x80) {
+      char received = i2c_read();
+
+      if (received == '\n' || buffer_index >= sizeof(i2c_buffer) - 1) {
+         i2c_buffer[buffer_index] = '\0';
+         buffer_index = 0;
+         parse_color_data();
+      } else {
+         i2c_buffer[buffer_index++] = received;
+      }
+   }
+}
+
+int str_to_int(char *str) {
+   int res = 0;
+   while (*str >= '0' && *str <= '9') {
+      res = res * 10 + (*str - '0');
+      str++;
+   }
+   return res;
+}
+
+void parse_color_data() {
+   int i = 0, j = 0;
+   char temp[6];
+
+   // Nombre
+   while (i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(color_name) - 1) {
+      color_name[j++] = i2c_buffer[i++];
+   }
+   color_name[j] = '\0';
+   i++;
+
+   // Rojo
+   j = 0;
+   while (i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(temp) - 1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   red = str_to_int(temp);
+   i++;
+
+   // Verde
+   j = 0;
+   while (i2c_buffer[i] != ',' && i2c_buffer[i] != '\0' && j < sizeof(temp) - 1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   green = str_to_int(temp);
+   i++;
+
+   // Azul
+   j = 0;
+   while (i2c_buffer[i] != '\0' && j < sizeof(temp) - 1) {
+      temp[j++] = i2c_buffer[i++];
+   }
+   temp[j] = '\0';
+   blue = str_to_int(temp);
+
+   lcd_clear();
+   lcd_write_str("Color:");
+   lcd_command(0xC0); // segunda línea
+   lcd_write_str(color_name);
+
+   update_leds();
+}
+
+void update_leds() {
+   output_high(LED_RED);
+   output_high(LED_GREEN);
+   output_high(LED_BLUE);
+
+   delay_ms(red);
+   output_low(LED_RED);
+
+   delay_ms(green);
+   output_low(LED_GREEN);
+
+   delay_ms(blue);
+   output_low(LED_BLUE);
+}
+
+// LCD FUNCIONES
+
+void lcd_nibble(unsigned char nibble) {
+   output_bit(LCD_D4, (nibble >> 0) & 1);
+   output_bit(LCD_D5, (nibble >> 1) & 1);
+   output_bit(LCD_D6, (nibble >> 2) & 1);
+   output_bit(LCD_D7, (nibble >> 3) & 1);
+   output_high(LCD_EN);
+   delay_us(1);
+   output_low(LCD_EN);
+}
+
+void lcd_command(unsigned char cmd) {
+   output_low(LCD_RS);
+   output_low(LCD_RW);
+   lcd_nibble(cmd >> 4);
+   lcd_nibble(cmd & 0x0F);
+   delay_ms(2);
+}
+
+void lcd_write_char(char c) {
+   output_high(LCD_RS);
+   output_low(LCD_RW);
+   lcd_nibble(c >> 4);
+   lcd_nibble(c & 0x0F);
+   delay_us(100);
+}
+
+void lcd_write_str(const char *str) {
+   while (*str) {
+      lcd_write_char(*str++);
+   }
+}
+
+void lcd_clear() {
+   lcd_command(0x01);
+   delay_ms(2);
+}
+
+void lcd_init() {
+   delay_ms(15);
+   lcd_command(0x03);
+   delay_ms(5);
+   lcd_command(0x03);
+   delay_us(100);
+   lcd_command(0x03);
+   lcd_command(0x02);
+   lcd_command(0x28);
+   lcd_command(0x0C);
+   lcd_command(0x06);
+   lcd_clear();
+}
+
+void main() {
+   set_tris_d(0x00);
+   set_tris_c(0x18); // C3 y C4 como entradas (SDA/SCL)
+
+   lcd_init();
+   output_low(LED_RED);
+   output_low(LED_GREEN);
+   output_low(LED_BLUE);
+
+   enable_interrupts(INT_SSP);
+   enable_interrupts(GLOBAL);
+
+   lcd_clear();
+   lcd_write_str("Sistema Listo");
+   delay_ms(1000);
+   lcd_clear();
+   lcd_write_str("Esperando...");
+
+   while (TRUE) {
+      delay_ms(100);
+   }
+}
+

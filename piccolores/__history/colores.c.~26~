@@ -1,0 +1,140 @@
+#include <16F877A.h>
+#use delay(crystal=4MHz)
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+#use I2C(SLAVE, SDA=PIN_C4, SCL=PIN_C3, address=0x11, FORCE_HW)
+
+/* Definición pines LCD */
+#define LCD_RS PIN_D0
+#define LCD_RW PIN_D1
+#define LCD_EN PIN_D2
+#define LCD_D4 PIN_D4
+#define LCD_D5 PIN_D5
+#define LCD_D6 PIN_D6
+#define LCD_D7 PIN_D7
+
+char i2c_buffer[32];
+int8 buffer_index = 0;
+
+/* Prototipos */
+void lcd_init();
+void lcd_command(unsigned char cmd);
+void lcd_write_char(char c);
+void lcd_write_str(const char*str);
+void lcd_clear();
+
+#INT_SSP
+void i2c_isr() {
+   int8 state = i2c_isr_state();
+   int8 data;
+   
+   if(state < 0x80) { // Escritura maestro -> esclavo
+      data = i2c_read();
+      if(data == '\n' || buffer_index >= sizeof(i2c_buffer)-1) {
+         i2c_buffer[buffer_index] = '\0';
+         lcd_clear();
+         lcd_write_str(i2c_buffer);
+         buffer_index = 0;
+      } else {
+         i2c_buffer[buffer_index++] = data;
+      }
+   }
+   
+   if(state == 0x80) { // Lectura maestro <- esclavo (no usado aquí)
+      i2c_write(0);
+   }
+}
+
+void main() {
+   set_tris_d(0x00); // Puerto D salida LCD
+   set_tris_c(0x18); // C4 SDA y C3 SCL entradas
+   
+   lcd_init();
+   lcd_clear();
+   lcd_write_str("Esperando...");
+
+   enable_interrupts(INT_SSP);
+   enable_interrupts(GLOBAL);
+
+   while(TRUE) {
+      delay_ms(100);
+   }
+}
+
+/* Funciones LCD modo 4 bits */
+
+void lcd_init() {
+   delay_ms(15);
+   lcd_command(0x03);
+   delay_ms(5);
+   lcd_command(0x03);
+   delay_us(100);
+   lcd_command(0x03);
+   lcd_command(0x02); // 4 bits
+   lcd_command(0x28); // 2 líneas
+   lcd_command(0x0C); // Display on, cursor off
+   lcd_command(0x06); // Incremento cursor
+   lcd_command(0x01); // Clear
+   delay_ms(2);
+}
+
+void lcd_command(unsigned char cmd) {
+   output_low(LCD_RS);
+   output_low(LCD_RW);
+   
+   output_bit(LCD_D4, cmd & 0x10);
+   output_bit(LCD_D5, cmd & 0x20);
+   output_bit(LCD_D6, cmd & 0x40);
+   output_bit(LCD_D7, cmd & 0x80);
+   
+   output_high(LCD_EN);
+   delay_us(1);
+   output_low(LCD_EN);
+   delay_us(100);
+   
+   output_bit(LCD_D4, cmd & 0x01);
+   output_bit(LCD_D5, cmd & 0x02);
+   output_bit(LCD_D6, cmd & 0x04);
+   output_bit(LCD_D7, cmd & 0x08);
+   
+   output_high(LCD_EN);
+   delay_us(1);
+   output_low(LCD_EN);
+   delay_ms(2);
+}
+
+void lcd_write_char(char c) {
+   output_high(LCD_RS);
+   output_low(LCD_RW);
+   
+   output_bit(LCD_D4, c & 0x10);
+   output_bit(LCD_D5, c & 0x20);
+   output_bit(LCD_D6, c & 0x40);
+   output_bit(LCD_D7, c & 0x80);
+   
+   output_high(LCD_EN);
+   delay_us(1);
+   output_low(LCD_EN);
+   delay_us(100);
+   
+   output_bit(LCD_D4, c & 0x01);
+   output_bit(LCD_D5, c & 0x02);
+   output_bit(LCD_D6, c & 0x04);
+   output_bit(LCD_D7, c & 0x08);
+   
+   output_high(LCD_EN);
+   delay_us(1);
+   output_low(LCD_EN);
+   delay_us(100);
+}
+
+void lcd_write_str(const char *str) {
+   while(*str) {
+      lcd_write_char(*str++);
+   }
+}
+
+void lcd_clear() {
+   lcd_command(0x01);
+   delay_ms(2);
+}
+

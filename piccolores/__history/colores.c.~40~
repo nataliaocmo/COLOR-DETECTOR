@@ -1,0 +1,26 @@
+#include <16F877A.h>
+#use delay(crystal=4MHz)
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+
+// Conexiones LCD (ajusta según tu hardware)
+#define LCD_RS  PIN_D0
+#define LCD_RW  PIN_D1
+#define LCD_E   PIN_D2
+#define LCD_D4  PIN_D4
+#define LCD_D5  PIN_D5
+#define LCD_D6  PIN_D6
+#define LCD_D7  PIN_D7
+
+#include <lcd.c>
+
+void main() {
+    lcd_init(); // Inicializar LCD
+    
+    lcd_putc('\f'); // Limpiar pantalla
+    lcd_gotoxy(1,1);
+    lcd_putc("LCD Funciona!");
+    lcd_gotoxy(1,2);
+    lcd_putc("Prueba OK");
+    
+    while(TRUE);
+}

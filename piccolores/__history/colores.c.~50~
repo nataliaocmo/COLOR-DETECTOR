@@ -1,0 +1,51 @@
+#include <16F877A.h>
+#fuses HS, NOWDT, NOPROTECT, NOLVP
+#use delay(clock=20000000)
+#use i2c(SLAVE, SDA=PIN_C4, SCL=PIN_C3, address=0x22, FORCE_HW)
+
+#define LED_ROJO     PIN_B0
+#define LED_AMARILLO PIN_B1
+#define LED_AZUL     PIN_B2
+
+int8 r = 0, g = 0, b = 0;
+int8 i2c_index = 0;
+int1 nuevo_dato = FALSE;
+
+#int_SSP
+void i2c_isr() {
+   int8 estado = i2c_isr_state();
+
+   if (estado < 0x80) { // Escritura del maestro
+      int8 valor = i2c_read();
+      if (i2c_index == 0) r = valor;
+      else if (i2c_index == 1) g = valor;
+      else if (i2c_index == 2) {
+         b = valor;
+         nuevo_dato = TRUE;
+      }
+      i2c_index++;
+      if (i2c_index >= 3) i2c_index = 0;
+   }
+}
+
+void main() {
+   set_tris_b(0x00);  // Puerto B como salida
+   output_b(0x00);    // Apagar todo
+   enable_interrupts(GLOBAL);
+   enable_interrupts(INT_SSP);
+
+   while (TRUE) {
+      if (nuevo_dato) {
+         int1 esRojo = (r > 200 && g < 100 && b < 100);
+         int1 esAmarillo = (r > 200 && g > 200 && b < 100);
+         int1 esAzul = (b > 200 && r < 100 && g < 100);
+
+         output_bit(LED_ROJO, esRojo);
+         output_bit(LED_AMARILLO, esAmarillo);
+         output_bit(LED_AZUL, esAzul);
+
+         nuevo_dato = FALSE;
+      }
+   }
+}
+
